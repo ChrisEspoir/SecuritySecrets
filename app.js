@@ -3,8 +3,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
-const md5 = require('md5'); //Hash Function for password
 
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 const port = 3000
@@ -35,28 +36,43 @@ app.get('/register', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
-    });
-    newUser.save()
-        .then(() => {
-            console.log('Saved successfully to userDB');
-            res.render('secrets');
+
+    bcrypt.hash(req.body.password, saltRounds)
+        .then((hash) => {
+
+            const newUser = new User({
+                email: req.body.username,
+                password: hash
+            });
+            newUser.save()
+                .then(() => {
+                    console.log('Saved successfully to userDB');
+                    res.render('secrets');
+                })
+                .catch((err) => {console.error(`Error found while savind to userDB: ${err}`);})
         })
-        .catch((err) => {console.error(`Error found while savind to userDB: ${err}`);})
+        .catch((err) => {console.error(`Error while Bcrypting: ${err}`);})
+
+    
 })
 
 app.post('/login', (req, res) => {
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
 
     User.findOne({email: username})
         .then((foundUser) => {
-            if (foundUser.password === password) {
-                console.log(`Successfully found and now rendering secrets`);
-                res.render('secrets');
-            };
+            bcrypt.compare(password, foundUser.password)
+                .then((result) => {
+                    if (result === true) {
+                        console.log(`Successfully found and now rendering secrets`);
+                        res.render('secrets');
+                    }else {
+                        res.render('login-fail')
+                    }
+                    
+                })
+          
         })
         .catch((err) => {console.error(`Error found: ${err}`);})
 })
